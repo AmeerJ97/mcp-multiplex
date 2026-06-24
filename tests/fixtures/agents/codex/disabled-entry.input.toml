@@ -1,0 +1,5 @@
+[mcp_servers.legacy_docs]
+command = "uvx"
+args = ["legacy-docs-mcp"]
+disabled = true
+

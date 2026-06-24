@@ -1,0 +1,5 @@
+[mcp_servers.experimental]
+command = "node"
+args = ["server.js"]
+future_flag = "preserve-me"
+

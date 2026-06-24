@@ -1,0 +1,98 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-multiplex"
+version = "0.1.0"
+description = "Daemon-first local control plane for Model Context Protocol (MCP) server multiplexing across coding agents."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "MCP Multiplex Maintainers" }]
+keywords = [
+  "mcp",
+  "model-context-protocol",
+  "ai",
+  "agent",
+  "cli",
+  "governance",
+  "daemon",
+  "proxy",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+  "Topic :: System :: Systems Administration",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/AmeerJ97/mcp-multiplex"
+Documentation = "https://github.com/AmeerJ97/mcp-multiplex#readme"
+Repository = "https://github.com/AmeerJ97/mcp-multiplex"
+Issues = "https://github.com/AmeerJ97/mcp-multiplex/issues"
+Protocol = "https://modelcontextprotocol.io"
+
+[project.scripts]
+mxp = "mcp_multiplex.cli:main"
+mcp-multiplex = "mcp_multiplex.cli:main"
+mcp-multiplex-daemon = "mcp_multiplex.daemon:main"
+
+[dependency-groups]
+dev = [
+  "mypy>=1.19",
+  "pytest>=9.0",
+  "ruff>=0.14",
+  "twine>=6.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_multiplex"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/docs",
+  "/LICENSE",
+  "/NOTICE",
+  "/README.md",
+  "/SECURITY.md",
+  "/CONTRIBUTING.md",
+  "/PUBLIC_RELEASE_NOTES.md",
+  "/CHANGELOG.md",
+  "/CODE_OF_CONDUCT.md",
+  "/pyproject.toml",
+  "/uv.lock",
+]
+exclude = [
+  "/.codex-checkpoints",
+  "/docs/checkpoints",
+  "/docs/FRESH_SESSION_PROMPT.md",
+  "/docs/GITHUB_POLISH_MASTER_PROMPT.md",
+  "/docs/PUBLIC_GITHUB_READINESS_AUDIT_REPORT.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["mcp_multiplex"]

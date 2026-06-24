@@ -1,0 +1,33 @@
+[
+  {
+    "agent_id": "agent_gemini_user_default",
+    "agent_kind": "gemini",
+    "approval_policy": null,
+    "args": [
+      "server.js"
+    ],
+    "command": "node",
+    "config_path": "tests/fixtures/agents/gemini/unsupported-field.input.json",
+    "container_path": [
+      "mcpServers",
+      "experimental"
+    ],
+    "cwd": null,
+    "enabled": true,
+    "entry_hash": "sha256:a72418d6eb387247e5685f5e0fa90922a52d42f307a7be59e5151fc8300955be",
+    "env_names": [],
+    "headers_present": [],
+    "mount_name": "experimental",
+    "observed_entry_id": "obs_700d9a82efa282c22d5b6e7d",
+    "parser_confidence": "partial",
+    "raw_shape": "gemini-json",
+    "schema_version": 1,
+    "tool_filters": {
+      "disabled_tools": [],
+      "enabled_tools": null
+    },
+    "transport": "stdio",
+    "url": null
+  }
+]
+

@@ -1,0 +1,41 @@
+[
+  {
+    "agent_id": "agent_opencode_user_default",
+    "agent_kind": "opencode",
+    "approval_policy": "on-request",
+    "args": [
+      "mcp-server-github",
+      "--readonly"
+    ],
+    "command": "uvx",
+    "config_path": "tests/fixtures/agents/opencode/env-cwd-args.input.jsonc",
+    "container_path": [
+      "mcpServers",
+      "github"
+    ],
+    "cwd": "/workspace/project",
+    "enabled": true,
+    "entry_hash": "sha256:d2777274b3d830d9ade8847386cd1bcbc783e76d3f5081eed90033f85b430bff",
+    "env_names": [
+      "GITHUB_OWNER",
+      "GITHUB_TOKEN"
+    ],
+    "headers_present": [],
+    "mount_name": "github",
+    "observed_entry_id": "obs_91814f2cecfc5507e612a35b",
+    "parser_confidence": "complete",
+    "raw_shape": "opencode-json",
+    "schema_version": 1,
+    "tool_filters": {
+      "disabled_tools": [
+        "delete_repository"
+      ],
+      "enabled_tools": [
+        "get_issue",
+        "list_pull_requests"
+      ]
+    },
+    "transport": "stdio",
+    "url": null
+  }
+]

@@ -1,0 +1,61 @@
+---
+name: CI
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v6.0.1
+        uses: >-
+          actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+
+      - name: Install uv
+        # astral-sh/setup-uv v8.1.0
+        uses: >-
+          astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        with:
+          version: "0.11.8"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install project
+        run: uv sync --locked --dev --python ${{ matrix.python-version }}
+
+      - name: Check formatting
+        run: uv run --python ${{ matrix.python-version }} ruff format --check .
+
+      - name: Lint
+        run: >-
+          uv run --python ${{ matrix.python-version }}
+          ruff check --output-format=github .
+
+      - name: Type check
+        run: uv run --python ${{ matrix.python-version }} mypy src tests
+
+      - name: Test
+        run: uv run --python ${{ matrix.python-version }} pytest -q --tb=short
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Verify distribution metadata
+        run: uv run --python ${{ matrix.python-version }} twine check dist/*

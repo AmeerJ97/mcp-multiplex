@@ -1,0 +1,33 @@
+[
+  {
+    "agent_id": "agent_codex_user_default",
+    "agent_kind": "codex",
+    "approval_policy": null,
+    "args": [
+      "legacy-docs-mcp"
+    ],
+    "command": "uvx",
+    "config_path": "tests/fixtures/agents/codex/disabled-entry.input.toml",
+    "container_path": [
+      "mcp_servers",
+      "legacy_docs"
+    ],
+    "cwd": null,
+    "enabled": false,
+    "entry_hash": "sha256:f69166f225cb82751a66820c7e46a23fb4fd2ad84417125d3e9a909b136026ec",
+    "env_names": [],
+    "headers_present": [],
+    "mount_name": "legacy_docs",
+    "observed_entry_id": "obs_dd087f0a98f41430c5a90073",
+    "parser_confidence": "complete",
+    "raw_shape": "codex-toml",
+    "schema_version": 1,
+    "tool_filters": {
+      "disabled_tools": [],
+      "enabled_tools": null
+    },
+    "transport": "stdio",
+    "url": null
+  }
+]
+

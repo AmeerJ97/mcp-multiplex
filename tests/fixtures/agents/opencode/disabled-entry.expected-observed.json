@@ -1,0 +1,33 @@
+[
+  {
+    "agent_id": "agent_opencode_user_default",
+    "agent_kind": "opencode",
+    "approval_policy": null,
+    "args": [
+      "-y",
+      "@upstash/context7-mcp"
+    ],
+    "command": "npx",
+    "config_path": "tests/fixtures/agents/opencode/disabled-entry.input.json",
+    "container_path": [
+      "mcpServers",
+      "context7"
+    ],
+    "cwd": null,
+    "enabled": false,
+    "entry_hash": "sha256:83a5eef86074936c78959cd9915431cd21f3f8aeae6ceffed69f84db1699c6cb",
+    "env_names": [],
+    "headers_present": [],
+    "mount_name": "context7",
+    "observed_entry_id": "obs_6dad36a1df69f4a27e36167d",
+    "parser_confidence": "complete",
+    "raw_shape": "opencode-json",
+    "schema_version": 1,
+    "tool_filters": {
+      "disabled_tools": [],
+      "enabled_tools": null
+    },
+    "transport": "stdio",
+    "url": null
+  }
+]

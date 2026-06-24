@@ -1,0 +1,31 @@
+[
+  {
+    "agent_id": "agent_codex_user_default",
+    "agent_kind": "codex",
+    "approval_policy": null,
+    "args": [],
+    "command": null,
+    "config_path": "tests/fixtures/agents/codex/hub-routed.input.toml",
+    "container_path": [
+      "mcp_servers",
+      "context7"
+    ],
+    "cwd": null,
+    "enabled": true,
+    "entry_hash": "sha256:1395bb5dfeefa3e46e6260275ad618b82402682d5e827f3d2950442b77d1d04d",
+    "env_names": [],
+    "headers_present": [],
+    "mount_name": "context7",
+    "observed_entry_id": "obs_b451287d23e944c8f2382c10",
+    "parser_confidence": "complete",
+    "raw_shape": "codex-toml",
+    "schema_version": 1,
+    "tool_filters": {
+      "disabled_tools": [],
+      "enabled_tools": null
+    },
+    "transport": "streamable_http",
+    "url": "http://127.0.0.1:30000/servers/context7/mcp"
+  }
+]
+

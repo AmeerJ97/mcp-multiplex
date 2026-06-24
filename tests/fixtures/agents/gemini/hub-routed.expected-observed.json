@@ -1,0 +1,31 @@
+[
+  {
+    "agent_id": "agent_gemini_user_default",
+    "agent_kind": "gemini",
+    "approval_policy": null,
+    "args": [],
+    "command": null,
+    "config_path": "tests/fixtures/agents/gemini/hub-routed.input.json",
+    "container_path": [
+      "mcpServers",
+      "context7"
+    ],
+    "cwd": null,
+    "enabled": true,
+    "entry_hash": "sha256:1395bb5dfeefa3e46e6260275ad618b82402682d5e827f3d2950442b77d1d04d",
+    "env_names": [],
+    "headers_present": [],
+    "mount_name": "context7",
+    "observed_entry_id": "obs_9ae1657876f33f50609ac11f",
+    "parser_confidence": "complete",
+    "raw_shape": "gemini-json",
+    "schema_version": 1,
+    "tool_filters": {
+      "disabled_tools": [],
+      "enabled_tools": null
+    },
+    "transport": "streamable_http",
+    "url": "http://127.0.0.1:30000/servers/context7/mcp"
+  }
+]
+

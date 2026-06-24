@@ -1,0 +1,32 @@
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.codex-checkpoints/
+docs/checkpoints/
+docs/GITHUB_POLISH_MASTER_PROMPT.md
+docs/PUBLIC_GITHUB_READINESS_AUDIT_REPORT.md
+
+# Generated image/asset candidates during selection phase.
+# User is actively downloading until final assets are chosen.
+# These must be excluded (or moved to a committed assets/ dir) before public release.
+Gemini_Generated_Image_*
+*.generated*.png
+*.generated*.jpg
+*.generated*.jpeg
+# Safe to remove these before creating the clean public export tree.

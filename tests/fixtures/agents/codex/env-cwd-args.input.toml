@@ -1,0 +1,12 @@
+[mcp_servers.github]
+command = "uvx"
+args = ["mcp-server-github", "--readonly"]
+cwd = "/workspace/project"
+approval_policy = "on-request"
+disabled_tools = ["delete_repository"]
+enabled_tools = ["get_issue", "list_pull_requests"]
+
+[mcp_servers.github.env]
+GITHUB_TOKEN = "secretref:github/token"
+GITHUB_OWNER = "octo"
+

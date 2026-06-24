@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "experimental": {
+      "command": "node",
+      "args": ["server.js"],
+      "future_flag": "preserve-me"
+    }
+  }
+}
+

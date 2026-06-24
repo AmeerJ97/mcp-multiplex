@@ -1,0 +1,34 @@
+[
+  {
+    "agent_id": "agent_claude_user_default",
+    "agent_kind": "claude_code",
+    "approval_policy": null,
+    "args": [
+      "-y",
+      "@upstash/context7-mcp"
+    ],
+    "command": "npx",
+    "config_path": "tests/fixtures/agents/claude_code/direct-context7.input.json",
+    "container_path": [
+      "mcpServers",
+      "context7"
+    ],
+    "cwd": null,
+    "enabled": true,
+    "entry_hash": "sha256:cc779d52d97548f54381092111c8837ddcff02f9474b85ccc9dbf52c1c6c67f9",
+    "env_names": [],
+    "headers_present": [],
+    "mount_name": "context7",
+    "observed_entry_id": "obs_e46b0dd989aa587907b32418",
+    "parser_confidence": "complete",
+    "raw_shape": "claude-code-json",
+    "schema_version": 1,
+    "tool_filters": {
+      "disabled_tools": [],
+      "enabled_tools": null
+    },
+    "transport": "stdio",
+    "url": null
+  }
+]
+

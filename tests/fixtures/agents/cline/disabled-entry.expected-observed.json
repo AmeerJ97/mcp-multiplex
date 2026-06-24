@@ -1,0 +1,33 @@
+[
+  {
+    "agent_id": "agent_cline_user_default",
+    "agent_kind": "cline",
+    "approval_policy": null,
+    "args": [
+      "-y",
+      "@upstash/context7-mcp"
+    ],
+    "command": "npx",
+    "config_path": "tests/fixtures/agents/cline/disabled-entry.input.json",
+    "container_path": [
+      "mcpServers",
+      "context7"
+    ],
+    "cwd": null,
+    "enabled": false,
+    "entry_hash": "sha256:0b95eb8afda6488149f0dbc93ea266558c40dc760174f4e3329866c6e19d0d5e",
+    "env_names": [],
+    "headers_present": [],
+    "mount_name": "context7",
+    "observed_entry_id": "obs_ad4693c3b791eb6af8b4c653",
+    "parser_confidence": "complete",
+    "raw_shape": "cline-json",
+    "schema_version": 1,
+    "tool_filters": {
+      "disabled_tools": [],
+      "enabled_tools": null
+    },
+    "transport": "stdio",
+    "url": null
+  }
+]
