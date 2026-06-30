@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - CI now isolates `mxp config inspect --home` from ambient runner XDG paths.
+- OpenSSF Scorecard now uploads SARIF to GitHub without relying on
+  scorecard.dev publishing.
 
 ## [0.1.0] - 2026-06-22
 

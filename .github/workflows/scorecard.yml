@@ -18,7 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
       security-events: write
 
     steps:
@@ -29,7 +28,7 @@ jobs:
         with:
           results_file: results.sarif
           results_format: sarif
-          publish_results: true
+          publish_results: false
           repo_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload SARIF results
