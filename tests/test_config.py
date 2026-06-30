@@ -24,6 +24,20 @@ def test_resolve_environment_layout_uses_deterministic_home(tmp_path: Path) -> N
     assert layout.policy_path == tmp_path / ".config" / "mcp-multiplex" / "policy.toml"
 
 
+def test_resolve_environment_layout_home_ignores_ambient_xdg(tmp_path: Path) -> None:
+    env = {
+        "XDG_CONFIG_HOME": "/home/runner/.config",
+        "XDG_STATE_HOME": "/home/runner/.local/state",
+        "XDG_CACHE_HOME": "/home/runner/.cache",
+    }
+
+    layout = resolve_environment_layout(home=tmp_path, env=env)
+
+    assert layout.config_dir == tmp_path / ".config" / "mcp-multiplex"
+    assert layout.state_dir == tmp_path / ".local" / "state" / "mcp-multiplex"
+    assert layout.cache_dir == tmp_path / ".cache" / "mcp-multiplex"
+
+
 def test_resolve_environment_layout_honors_overrides(tmp_path: Path) -> None:
     env = {
         "MCP_MULTIPLEX_CONFIG_DIR": str(tmp_path / "cfg"),
@@ -102,22 +116,32 @@ def test_load_policy_config_rejects_invalid_shape(tmp_path: Path) -> None:
 
 def test_cli_config_inspect_uses_temp_home_without_mutating(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/home/runner/.config")
+    monkeypatch.setenv("XDG_STATE_HOME", "/home/runner/.local/state")
+    monkeypatch.setenv("XDG_CACHE_HOME", "/home/runner/.cache")
+
     exit_code = cli_main(["config", "inspect", "--home", str(tmp_path)])
 
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["kind"] == "MCPMultiplexConfigInspect"
     assert payload["paths"]["config_dir"] == str(tmp_path / ".config" / "mcp-multiplex")
+    assert payload["paths"]["state_dir"] == str(tmp_path / ".local" / "state" / "mcp-multiplex")
+    assert payload["paths"]["cache_dir"] == str(tmp_path / ".cache" / "mcp-multiplex")
     assert payload["policy"] == default_policy_config()
     assert list(tmp_path.iterdir()) == []
 
 
 def test_cli_config_inspect_reports_malformed_policy(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/home/runner/.config")
+
     config_dir = tmp_path / ".config" / "mcp-multiplex"
     config_dir.mkdir(parents=True)
     policy_path = config_dir / "policy.toml"
