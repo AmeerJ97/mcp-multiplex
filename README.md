@@ -336,15 +336,20 @@ See [SECURITY.md](SECURITY.md) for private vulnerability reporting.
 - [Real-Client Certification Evidence](docs/certifications/README.md)
 - [MXP / CLI Guide](docs/MXP_CLI.md)
 - [Schemas And Contracts](docs/SCHEMAS_AND_CONTRACTS.md)
-- [Product Requirements](docs/PRD.md)
-- [Acceptance Test Plan](docs/ACCEPTANCE_TEST_PLAN.md)
-- [Implementation Blueprint](docs/IMPLEMENTATION_BLUEPRINT.md)
+- [Public Roadmap](docs/ROADMAP.md)
+- [Governance](GOVERNANCE.md)
 - [Public Release Notes](PUBLIC_RELEASE_NOTES.md)
-- [Public Repository Publication](PUBLICATION.md)
 
-The PRD, blueprint, and roadmap document the design history and intended
-invariants. The implementation, tests, and current CLI help are authoritative
-for released behavior.
+The implementation, tests, current CLI help, and public documentation are
+authoritative for released behavior.
+
+## Open Core Direction
+
+MCP Multiplex keeps the single-user local control plane, catalog, policy,
+runtime proxy, adapters, CLI, and safety model open source under Apache 2.0.
+Future commercial work may focus on team and enterprise needs such as fleet
+management, centralized policy distribution, compliance reporting, SSO/RBAC,
+managed hosting, and premium support.
 
 ## Development
 
@@ -372,13 +377,6 @@ make format
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before changing mutation, authentication,
 credential, or runtime-sharing behavior.
-
-## Public Release Hygiene
-
-The private development repository contains checkpoint artifacts that are not
-part of the source distribution. Follow [PUBLICATION.md](PUBLICATION.md) to
-create a clean public repository without rewriting or exposing private
-development history.
 
 ## License
 
