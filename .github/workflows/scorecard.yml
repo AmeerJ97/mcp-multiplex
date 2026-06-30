@@ -11,13 +11,16 @@ name: OpenSSF Scorecard
 
 permissions:
   contents: read
-  id-token: write
   security-events: write
 
 jobs:
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
 
     steps:
       - name: Run Scorecard
