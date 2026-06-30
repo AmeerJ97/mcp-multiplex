@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/ci.yml/badge.svg)](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/codeql.yml/badge.svg)](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/AmeerJ97/mcp-multiplex/badge)](https://securityscorecards.dev/viewer/?uri=github.com/AmeerJ97/mcp-multiplex)
+[![OpenSSF Scorecard](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/scorecard.yml/badge.svg)](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/scorecard.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-3776AB.svg)](https://www.python.org/)
 [![uv](https://img.shields.io/badge/managed%20with-uv-DE5FE9.svg)](https://docs.astral.sh/uv/)
