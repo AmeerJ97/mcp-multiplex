@@ -86,20 +86,21 @@ def resolve_environment_layout(
     """Resolve config, state, and cache directories without creating them."""
     source_env = os.environ if env is None else env
     resolved_home = _home_path(home)
+    use_xdg_env = home is None
 
     config_dir = _env_path(source_env, "MCP_MULTIPLEX_CONFIG_DIR")
     if config_dir is None:
-        xdg_config_home = _env_path(source_env, "XDG_CONFIG_HOME")
+        xdg_config_home = _env_path(source_env, "XDG_CONFIG_HOME") if use_xdg_env else None
         config_dir = (xdg_config_home or (resolved_home / ".config")) / APP_DIR_NAME
 
     state_dir = _env_path(source_env, "MCP_MULTIPLEX_STATE_DIR")
     if state_dir is None:
-        xdg_state_home = _env_path(source_env, "XDG_STATE_HOME")
+        xdg_state_home = _env_path(source_env, "XDG_STATE_HOME") if use_xdg_env else None
         state_dir = (xdg_state_home or (resolved_home / ".local" / "state")) / APP_DIR_NAME
 
     cache_dir = _env_path(source_env, "MCP_MULTIPLEX_CACHE_DIR")
     if cache_dir is None:
-        xdg_cache_home = _env_path(source_env, "XDG_CACHE_HOME")
+        xdg_cache_home = _env_path(source_env, "XDG_CACHE_HOME") if use_xdg_env else None
         cache_dir = (xdg_cache_home or (resolved_home / ".cache")) / APP_DIR_NAME
 
     return EnvironmentLayout(
