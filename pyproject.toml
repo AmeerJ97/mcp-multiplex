@@ -65,6 +65,8 @@ include = [
   "/README.md",
   "/SECURITY.md",
   "/CONTRIBUTING.md",
+  "/GOVERNANCE.md",
+  "/SUPPORT.md",
   "/PUBLIC_RELEASE_NOTES.md",
   "/CHANGELOG.md",
   "/CODE_OF_CONDUCT.md",
