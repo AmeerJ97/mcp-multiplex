@@ -6,13 +6,82 @@ name: CI
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
+env:
+  UV_VERSION: "0.11.8"
+
 jobs:
-  quality:
-    name: Python ${{ matrix.python-version }}
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v7.0.0
+        uses: >-
+          actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Install uv
+        # astral-sh/setup-uv v8.2.0
+        uses: >-
+          astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          cache-suffix: lint
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Install project
+        run: uv sync --locked --dev --python 3.13
+
+      - name: Check formatting
+        run: uv run --python 3.13 ruff format --check .
+
+      - name: Lint
+        run: uv run --python 3.13 ruff check --output-format=github .
+
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v7.0.0
+        uses: >-
+          actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Install uv
+        # astral-sh/setup-uv v8.2.0
+        uses: >-
+          astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          cache-suffix: typecheck
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Install project
+        run: uv sync --locked --dev --python 3.13
+
+      - name: Type check
+        run: uv run --python 3.13 mypy src tests
+
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -21,18 +90,19 @@ jobs:
 
     steps:
       - name: Check out repository
-        # actions/checkout v6.0.1
+        # actions/checkout v7.0.0
         uses: >-
           actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Install uv
-        # astral-sh/setup-uv v8.1.0
+        # astral-sh/setup-uv v8.2.0
         uses: >-
           astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
-          version: "0.11.8"
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
           cache-dependency-glob: "uv.lock"
+          cache-suffix: py${{ matrix.python-version }}
 
       - name: Install Python
         run: uv python install ${{ matrix.python-version }}
@@ -40,22 +110,60 @@ jobs:
       - name: Install project
         run: uv sync --locked --dev --python ${{ matrix.python-version }}
 
-      - name: Check formatting
-        run: uv run --python ${{ matrix.python-version }} ruff format --check .
-
-      - name: Lint
+      - name: Test
         run: >-
           uv run --python ${{ matrix.python-version }}
-          ruff check --output-format=github .
+          pytest -q --tb=short
+          --junitxml=test-results/pytest-${{ matrix.python-version }}.xml
 
-      - name: Type check
-        run: uv run --python ${{ matrix.python-version }} mypy src tests
+      - name: Upload test report
+        if: always()
+        # actions/upload-artifact v7.0.1
+        uses: >-
+          actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pytest-${{ matrix.python-version }}
+          path: test-results/*.xml
+          if-no-files-found: error
 
-      - name: Test
-        run: uv run --python ${{ matrix.python-version }} pytest -q --tb=short
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v7.0.0
+        uses: >-
+          actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Install uv
+        # astral-sh/setup-uv v8.2.0
+        uses: >-
+          astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          cache-suffix: package
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Install project
+        run: uv sync --locked --dev --python 3.13
 
       - name: Build distributions
         run: uv build
 
       - name: Verify distribution metadata
-        run: uv run --python ${{ matrix.python-version }} twine check dist/*
+        run: uv run --python 3.13 twine check dist/*
+
+      - name: Upload distributions
+        # actions/upload-artifact v7.0.1
+        uses: >-
+          actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: distributions
+          path: dist/*
+          if-no-files-found: error

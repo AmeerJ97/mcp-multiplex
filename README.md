@@ -3,6 +3,8 @@
 </p>
 
 [![CI](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/ci.yml/badge.svg)](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/codeql.yml/badge.svg)](https://github.com/AmeerJ97/mcp-multiplex/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/AmeerJ97/mcp-multiplex/badge)](https://securityscorecards.dev/viewer/?uri=github.com/AmeerJ97/mcp-multiplex)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-3776AB.svg)](https://www.python.org/)
 [![uv](https://img.shields.io/badge/managed%20with-uv-DE5FE9.svg)](https://docs.astral.sh/uv/)
@@ -21,6 +23,15 @@ auditable, and reversible state.
 > adapters and authenticated control-plane install paths for Codex, Claude Code,
 > Gemini CLI, Cline, and OpenCode. Run `mxp agents self-check` on each target
 > machine before enabling automatic remediation.
+
+## Known Limitations
+
+- Linux is the primary supported platform today.
+- Real-client certification is machine- and client-version-specific.
+- Automatic remediation should remain disabled until local self-check and
+  release-gate commands pass on the target machine.
+- Enterprise fleet management, centralized policy distribution, SSO/RBAC, and
+  hosted administration are outside the open source core.
 
 ## Why MCP Multiplex
 
@@ -337,7 +348,9 @@ See [SECURITY.md](SECURITY.md) for private vulnerability reporting.
 - [MXP / CLI Guide](docs/MXP_CLI.md)
 - [Schemas And Contracts](docs/SCHEMAS_AND_CONTRACTS.md)
 - [Public Roadmap](docs/ROADMAP.md)
+- [Release Process](docs/RELEASE.md)
 - [Governance](GOVERNANCE.md)
+- [Support](SUPPORT.md)
 - [Public Release Notes](PUBLIC_RELEASE_NOTES.md)
 
 The implementation, tests, current CLI help, and public documentation are

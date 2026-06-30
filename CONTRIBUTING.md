@@ -65,5 +65,9 @@ Keep pull requests reviewable and explain:
 - manual verification performed;
 - any compatibility or migration impact.
 
+Use short-lived branches and squash merges. `main` is treated as releasable, so
+all pull requests should pass CI before merge. Release-specific steps are
+documented in [`docs/RELEASE.md`](docs/RELEASE.md).
+
 By submitting a contribution, you agree that it is licensed under the
 [Apache License 2.0](LICENSE).
