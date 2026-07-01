@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Split CI workflow with explicit lint, type-check, test, and package jobs.
+- Tag-based release workflow for GitHub Releases and optional PyPI Trusted
+  Publishing.
+- CodeQL and OpenSSF Scorecard workflows.
+- Release process, support, and code owner documentation.
+
+### Fixed
+
+- CI now isolates `mxp config inspect --home` from ambient runner XDG paths.
+- OpenSSF Scorecard now uploads SARIF to GitHub without relying on
+  scorecard.dev publishing.
+
 ## [0.1.0] - 2026-06-22
 
 ### Added

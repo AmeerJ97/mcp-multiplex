@@ -47,7 +47,7 @@ ambiguous remediations. Review `SECURITY.md`, `docs/ARCHITECTURE.md`, and
 - Mypy passes across `src` and `tests`.
 - All 334 tests pass on Python 3.12 and Python 3.13.
 - Wheel and source distributions build successfully and pass `twine check`.
-- The clean public export passes the complete quality gate without private
-  checkpoint history.
+- The public release tree passes the complete quality gate without internal
+  release artifacts.
 - The live daemon, five client self-checks, global release gate, and MCP Hub
   retirement gate pass using hash-bound public certification evidence.
