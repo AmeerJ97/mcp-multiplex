@@ -28,6 +28,64 @@ def catalog_entry(**updates: object) -> CatalogEntry:
     return CatalogEntry.from_dict(payload)
 
 
+def xquik_catalog_entry() -> CatalogEntry:
+    payload = catalog_entry_payload()
+    payload.update(
+        {
+            "catalog_id": "srv_xquik",
+            "name": "xquik",
+            "canonical_name": "xquik.mcp",
+            "family_id": "xquik",
+            "variant_name": "remote_streamable_http",
+            "display_label": "Xquik",
+            "aliases": ["com.xquik/mcp", "x-twitter-scraper"],
+            "risk_tier": "normal",
+            "provenance": [
+                {
+                    "source": "public_mcp_manifest",
+                    "source_ref": "https://xquik.com/.well-known/mcp.json",
+                    "observed_entry_id": None,
+                    "metadata": {
+                        "manifest_name": "com.xquik/mcp",
+                        "manifest_version": "2.4.8",
+                        "docs": "https://docs.xquik.com/mcp/overview",
+                    },
+                }
+            ],
+            "transport": {
+                "frontend": "streamable_http",
+                "hub_path": "/servers/xquik/mcp",
+                "backend": {
+                    "type": "streamable_http",
+                    "command": None,
+                    "args": [],
+                    "cwd_policy": "none",
+                    "env": ["XQUIK_API_KEY"],
+                    "url": "https://xquik.com/mcp",
+                },
+            },
+            "runtime": {
+                "shareability": "per_account",
+                "concurrency": "concurrent_readonly",
+                "idle_timeout_sec": 600,
+                "health_check": "tools_list",
+            },
+            "credentials": [
+                {
+                    "name": "XQUIK_API_KEY",
+                    "kind": "bearer_token",
+                    "required": True,
+                }
+            ],
+            "active_set": {
+                "eligible_profiles": ["coding-default", "docs"],
+                "default_enabled": False,
+            },
+        }
+    )
+    return CatalogEntry.from_dict(payload)
+
+
 def test_catalog_store_persists_entry_aliases_and_provenance(
     connection: sqlite3.Connection,
 ) -> None:
@@ -111,6 +169,25 @@ def test_required_metadata_validation_allows_complete_approved_entry(
     assert check.routable is True
     assert check.reasons == []
     assert store.require_routable("srv_context7") == stored
+
+
+def test_catalog_store_accepts_xquik_remote_streamable_http_entry(
+    connection: sqlite3.Connection,
+) -> None:
+    store = CatalogStore(connection)
+    entry = xquik_catalog_entry()
+
+    stored = store.upsert(entry)
+    check = store.validate_routable("srv_xquik")
+
+    assert stored == entry
+    assert check.routable is True
+    assert check.reasons == []
+    assert stored.transport.backend.type == "streamable_http"
+    assert stored.transport.backend.url == "https://xquik.com/mcp"
+    assert stored.transport.backend.env == ["XQUIK_API_KEY"]
+    assert stored.runtime.shareability == "per_account"
+    assert store.require_routable("srv_xquik") == stored
 
 
 def test_required_metadata_validation_rejects_unapproved_or_disabled_entries(
