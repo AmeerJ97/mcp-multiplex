@@ -51,6 +51,25 @@ class LegacyCatalogImportPlan:
             "applied": self.applied,
         }
 
+    def to_summary_dict(self, *, sample_limit: int = 20) -> dict[str, Any]:
+        warnings_by_code: dict[str, int] = {}
+        for warning in self.warnings:
+            warnings_by_code[warning["code"]] = warnings_by_code.get(warning["code"], 0) + 1
+        return {
+            "source": self.source,
+            "catalog_path": self.catalog_path,
+            "source_hash": self.source_hash,
+            "entry_count": len(self.entries),
+            "entries": [entry.to_dict() for entry in self.entries[:sample_limit]],
+            "entries_truncated": len(self.entries) > sample_limit,
+            "errors": self.errors[:sample_limit],
+            "errors_truncated": len(self.errors) > sample_limit,
+            "warnings": self.warnings[:sample_limit],
+            "warnings_truncated": len(self.warnings) > sample_limit,
+            "warnings_by_code": warnings_by_code,
+            "applied": self.applied,
+        }
+
 
 def plan_legacy_mcp_hub_catalog_import(catalog_path: Path) -> LegacyCatalogImportPlan:
     """Parse and normalize a legacy MCP Hub catalog export without mutation."""

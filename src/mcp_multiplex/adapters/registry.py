@@ -128,6 +128,99 @@ class AgentRegistry:
                 )
         return self.show(agent_id)
 
+    def upsert(
+        self,
+        *,
+        agent_id: str,
+        agent_kind: str,
+        display_name: str,
+        workspace_root: str | Path | None = None,
+        config_paths: list[AgentConfigPath] | None = None,
+        control_plane_mount: str = "mcp_hub",
+        auth_token_ref: str | None = None,
+        certification_level: str = "unverified",
+    ) -> AgentRegistration:
+        """Create or replace a registration while preserving stable identity fields."""
+        self._validate_agent(
+            agent_id=agent_id,
+            agent_kind=agent_kind,
+            display_name=display_name,
+            control_plane_mount=control_plane_mount,
+            certification_level=certification_level,
+        )
+        path_records = config_paths or []
+        workspace = str(workspace_root) if workspace_root is not None else None
+        existing = None
+        try:
+            existing = self.show(agent_id)
+        except KeyError:
+            existing = None
+        if existing is not None:
+            if auth_token_ref is None:
+                auth_token_ref = existing.auth_token_ref
+            if certification_level == "unverified":
+                certification_level = existing.certification_level
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO agents (
+                  agent_id,
+                  agent_kind,
+                  display_name,
+                  workspace_root,
+                  control_plane_mount,
+                  auth_token_ref,
+                  certification_level
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(agent_id) DO UPDATE SET
+                  agent_kind = excluded.agent_kind,
+                  display_name = excluded.display_name,
+                  workspace_root = excluded.workspace_root,
+                  control_plane_mount = excluded.control_plane_mount,
+                  auth_token_ref = excluded.auth_token_ref,
+                  certification_level = excluded.certification_level,
+                  last_seen_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    agent_id,
+                    agent_kind,
+                    display_name,
+                    workspace,
+                    control_plane_mount,
+                    auth_token_ref,
+                    certification_level,
+                ),
+            )
+            self.connection.execute(
+                "DELETE FROM agent_config_paths WHERE agent_id = ?",
+                (agent_id,),
+            )
+            for index, config_path in enumerate(path_records):
+                self._validate_config_path(config_path)
+                self.connection.execute(
+                    """
+                    INSERT INTO agent_config_paths (
+                      config_path_id,
+                      agent_id,
+                      path,
+                      precedence,
+                      format,
+                      is_project_shared
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        config_path.config_path_id or f"{agent_id}:path:{index}",
+                        agent_id,
+                        config_path.path,
+                        config_path.precedence,
+                        config_path.format,
+                        int(config_path.is_project_shared),
+                    ),
+                )
+        return self.show(agent_id)
+
     def list(self) -> list[AgentRegistration]:
         """List registered agents in stable order."""
         rows = self.connection.execute(

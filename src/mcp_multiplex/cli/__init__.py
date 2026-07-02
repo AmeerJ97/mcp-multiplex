@@ -69,6 +69,29 @@ from mcp_multiplex.service import (
 )
 from mcp_multiplex.storage import connect
 
+DEFAULT_AGENT_IDS = {
+    "codex": "agent_codex_user_default",
+    "claude_code": "agent_claude_code_user_default",
+    "gemini": "agent_gemini_user_default",
+    "cline": "agent_cline_user_default",
+    "opencode": "agent_opencode_user_default",
+}
+
+DEFAULT_AGENT_DISPLAY_NAMES = {
+    "codex": "Codex CLI",
+    "claude_code": "Claude Code",
+    "gemini": "Gemini CLI",
+    "cline": "Cline",
+    "opencode": "OpenCode",
+}
+
+LEGACY_DISCOVERY_ROOTS = (
+    "~/mcp-hub",
+    "~/attic",
+    "/home/core/dev/attic",
+    "/home/core/dev/backups",
+)
+
 
 def daemon_health_url(host: str, port: int) -> str:
     """Build the local daemon health URL."""
@@ -108,6 +131,11 @@ def status_command(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> 
     """Print compact or JSON status from local Multiplex state."""
     connection = _state_connection(args)
     payload = status_payload(connection)
+    _augment_status_with_onboarding(
+        payload,
+        connection=connection,
+        home=Path(args.home).expanduser() if args.home else None,
+    )
     if args.compact:
         stdout.write(compact_status(payload) + "\n")
     else:
@@ -624,20 +652,121 @@ def agents_self_check_command(
     from mcp_multiplex.tui import tui_snapshot
 
     connection = _state_connection(args)
-    agents = tui_snapshot(connection)["agents"]
+    home = Path(args.home).expanduser() if args.home else None
+    agents = tui_snapshot(connection, home=home)["agents"]
     if args.agent:
         agents = [agent for agent in agents if agent["agent_kind"] == args.agent]
     not_ready = [agent for agent in agents if agent["self_check"] != "ready"]
+    onboarding = _agent_onboarding_payload(
+        connection,
+        home=home,
+        agent_kinds=[args.agent] if args.agent else None,
+    )
     payload = {
         "schema_version": 1,
         "kind": "MCPMultiplexAgentSelfCheck",
-        "ok": not not_ready,
+        "ok": not not_ready and onboarding["unregistered_count"] == 0 and bool(agents),
         "agent": args.agent,
         "agents": agents,
         "not_ready_count": len(not_ready),
+        "discovered_config_paths": onboarding["discovered_config_paths"],
+        "unregistered_agents": onboarding["unregistered_agents"],
+        "next_action": onboarding["next_action"],
     }
     stdout.write(json.dumps(payload, sort_keys=True) + "\n")
     return 0 if payload["ok"] else 1
+
+
+def agents_sync_command(
+    args: argparse.Namespace,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Discover first-wave agent configs and sync them into registry state."""
+    connection = _state_connection(args)
+    home = Path(args.home).expanduser() if args.home else None
+    requested = [args.agent] if args.agent else None
+    discovery = discover_config_paths(home=home, agent_kinds=requested)
+    registry = AgentRegistry(connection)
+    existing_by_kind = {agent.agent_kind: agent for agent in registry.list()}
+    grouped: dict[str, list[Any]] = {}
+    for config_path in discovery.config_paths:
+        grouped.setdefault(config_path.agent_kind, []).append(config_path)
+    changes: list[dict[str, Any]] = []
+    synced_agents: list[dict[str, Any]] = []
+    for agent_kind, discovered_paths in sorted(grouped.items()):
+        existing = existing_by_kind.get(agent_kind)
+        new_paths = [path.to_agent_config_path() for path in discovered_paths]
+        before_paths = [] if existing is None else [
+            {
+                "path": config_path.path,
+                "format": config_path.format,
+                "precedence": config_path.precedence,
+                "is_project_shared": config_path.is_project_shared,
+            }
+            for config_path in existing.config_paths
+        ]
+        after_paths = [
+            {
+                "path": config_path.path,
+                "format": config_path.format,
+                "precedence": config_path.precedence,
+                "is_project_shared": config_path.is_project_shared,
+            }
+            for config_path in new_paths
+        ]
+        action = "create"
+        if existing is not None and before_paths == after_paths:
+            action = "unchanged"
+        elif existing is not None:
+            action = "update"
+        changes.append(
+            {
+                "agent_kind": agent_kind,
+                "agent_id": (
+                    existing.agent_id if existing is not None else DEFAULT_AGENT_IDS[agent_kind]
+                ),
+                "action": action,
+                "paths": after_paths,
+            }
+        )
+        if args.apply and action != "unchanged":
+            synced = registry.upsert(
+                agent_id=(
+                    existing.agent_id if existing is not None else DEFAULT_AGENT_IDS[agent_kind]
+                ),
+                agent_kind=agent_kind,
+                display_name=(
+                    existing.display_name
+                    if existing is not None
+                    else DEFAULT_AGENT_DISPLAY_NAMES[agent_kind]
+                ),
+                workspace_root=None if existing is None else existing.workspace_root,
+                config_paths=new_paths,
+                auth_token_ref=None if existing is None else existing.auth_token_ref,
+                certification_level=(
+                    "unverified" if existing is None else existing.certification_level
+                ),
+            )
+            synced_agents.append(
+                {
+                    "agent_id": synced.agent_id,
+                    "agent_kind": synced.agent_kind,
+                    "config_path_count": len(synced.config_paths),
+                }
+            )
+    payload = {
+        "schema_version": 1,
+        "kind": "MCPMultiplexAgentSync",
+        "ok": True,
+        "mode": "apply" if args.apply else "dry_run",
+        "discovery": discovery.to_dict(),
+        "change_count": len([change for change in changes if change["action"] != "unchanged"]),
+        "changes": changes,
+        "synced_agents": synced_agents,
+    }
+    stdout.write(json.dumps(payload, sort_keys=True) + "\n")
+    return 0
 
 
 def daemon_install_user_service_command(
@@ -880,12 +1009,14 @@ def cutover_dry_run_command(args: argparse.Namespace, stdout: TextIO, stderr: Te
             + "\n"
         )
         return 2
-    payload = _migration_dry_run_payload(Path(args.legacy_root).expanduser().resolve())
+    home = Path(args.home).expanduser() if args.home else None
+    payload = _migration_dry_run_payload(_resolved_legacy_root(args.legacy_root, home=home))
     payload = {
         **payload,
         "kind": "MCPMultiplexCutoverDryRun",
         "source": args.source,
         "apply_supported": False,
+        "located": _legacy_source_locator(home=home),
         "next_actions": [
             "review classifications",
             "install authenticated mcp_hub for supported agents",
@@ -916,15 +1047,17 @@ def cutover_import_catalog_command(
             + "\n"
         )
         return 2
+    home = Path(args.home).expanduser() if args.home else None
     try:
+        catalog_path = _resolved_legacy_catalog_path(args.catalog_path, home=home)
         if args.apply:
             result = apply_legacy_mcp_hub_catalog_import(
                 _state_connection(args),
-                Path(args.catalog_path).expanduser(),
+                catalog_path,
                 actor=args.actor,
             )
         else:
-            result = plan_legacy_mcp_hub_catalog_import(Path(args.catalog_path).expanduser())
+            result = plan_legacy_mcp_hub_catalog_import(catalog_path)
     except LegacyCatalogImportError as error:
         stdout.write(
             json.dumps(
@@ -944,7 +1077,20 @@ def cutover_import_catalog_command(
         "kind": "MCPMultiplexLegacyCatalogImport",
         "ok": result.ok,
         "mode": "apply" if args.apply else "dry_run",
-        "result": result.to_dict(),
+        "result": (
+            result.to_dict()
+            if args.full_entries
+            else result.to_summary_dict(sample_limit=args.sample_limit)
+        ),
+        "summary": {
+            "entry_count": len(result.entries),
+            "error_count": len(result.errors),
+            "warning_count": len(result.warnings),
+            "warnings_by_code": {
+                code: len([warning for warning in result.warnings if warning["code"] == code])
+                for code in sorted({warning["code"] for warning in result.warnings})
+            },
+        },
     }
     stdout.write(json.dumps(payload, sort_keys=True) + "\n")
     return 0 if result.ok else 1
@@ -1067,9 +1213,10 @@ def cutover_status_command(args: argparse.Namespace, stdout: TextIO, stderr: Tex
         )
     legacy_footprint = None
     if args.check_footprint:
+        home = Path(args.home).expanduser() if args.home else None
         legacy_footprint = _legacy_mcp_hub_footprint_payload(
-            legacy_root=Path(args.legacy_root).expanduser().resolve(),
-            home=Path(args.home).expanduser() if args.home else None,
+            legacy_root=_resolved_legacy_root(args.legacy_root, home=home),
+            home=home,
             ps_bin=args.ps_bin,
             include_processes=not args.no_processes,
         )
@@ -1124,9 +1271,10 @@ def cutover_legacy_footprint_command(
             + "\n"
         )
         return 2
+    home = Path(args.home).expanduser() if args.home else None
     payload = _legacy_mcp_hub_footprint_payload(
-        legacy_root=Path(args.legacy_root).expanduser().resolve(),
-        home=Path(args.home).expanduser() if args.home else None,
+        legacy_root=_resolved_legacy_root(args.legacy_root, home=home),
+        home=home,
         ps_bin=args.ps_bin,
         include_processes=not args.no_processes,
     )
@@ -1154,13 +1302,22 @@ def cutover_legacy_cleanup_plan_command(
             + "\n"
         )
         return 2
+    home = Path(args.home).expanduser() if args.home else None
     footprint = _legacy_mcp_hub_footprint_payload(
-        legacy_root=Path(args.legacy_root).expanduser().resolve(),
-        home=Path(args.home).expanduser() if args.home else None,
+        legacy_root=_resolved_legacy_root(args.legacy_root, home=home),
+        home=home,
         ps_bin=args.ps_bin,
         include_processes=not args.no_processes,
     )
     payload = _legacy_cleanup_plan_payload(footprint)
+    stdout.write(json.dumps(payload, sort_keys=True) + "\n")
+    return 0 if payload["ok"] is True else 1
+
+
+def cutover_locate_command(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    """Locate likely legacy MCP Hub roots and catalog exports."""
+    home = Path(args.home).expanduser() if args.home else None
+    payload = _legacy_source_locator(home=home)
     stdout.write(json.dumps(payload, sort_keys=True) + "\n")
     return 0 if payload["ok"] is True else 1
 
@@ -1404,7 +1561,7 @@ def _parse_ps_line(line: str) -> dict[str, Any] | None:
 
 def _is_legacy_mcp_hub_process(args: str) -> bool:
     normalized = args.lower()
-    if "mcp-multiplex" in normalized:
+    if "mcp-multiplex" in normalized or "uv run mxp" in normalized or "mxp " in normalized:
         return False
     return any(
         marker in normalized
@@ -1417,6 +1574,112 @@ def _is_legacy_mcp_hub_process(args: str) -> bool:
             "\\mcp-hub\\",
         )
     )
+
+
+def _legacy_candidate_search_roots(home: Path | None) -> list[Path]:
+    resolved_home = (home or Path.home()).expanduser()
+    roots = [Path(pattern.replace("~", str(resolved_home))) for pattern in LEGACY_DISCOVERY_ROOTS]
+    if resolved_home not in roots:
+        roots.append(resolved_home)
+    return roots
+
+
+def _legacy_source_candidates(*, home: Path | None = None) -> list[dict[str, Any]]:
+    resolved_home = (home or Path.home()).expanduser().resolve()
+    candidates: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for root in _legacy_candidate_search_roots(home):
+        if root.name == "mcp-hub" and root.exists():
+            candidate_dirs = [root]
+        elif root.is_dir():
+            try:
+                candidate_dirs = [item for item in root.iterdir() if item.is_dir()]
+            except OSError:
+                candidate_dirs = []
+        else:
+            candidate_dirs = []
+        for candidate in candidate_dirs:
+            candidate = candidate.expanduser().resolve()
+            if str(candidate) in seen:
+                continue
+            if candidate.is_dir():
+                try:
+                    names = {item.name for item in candidate.iterdir()}
+                except OSError:
+                    continue
+            else:
+                names = set()
+            if (
+                candidate.name == "mcp-hub"
+                or "mcp-hub" in candidate.name
+                or "launch-hub.py" in names
+                or "launch-hub.sh" in names
+                or any(name.startswith("hub.json") for name in names)
+            ):
+                seen.add(str(candidate))
+                exports = sorted(
+                    str(item)
+                    for item in candidate.iterdir()
+                    if item.is_file() and item.name.startswith("hub.json")
+                )
+                score = int((candidate / ".git").exists()) * 3
+                score += int("launch-hub.py" in names or "launch-hub.sh" in names) * 2
+                score += min(len(exports), 3)
+                candidates.append(
+                    {
+                        "path": str(candidate),
+                        "git_repository": (candidate / ".git").exists(),
+                        "catalog_exports": exports,
+                        "launch_scripts": sorted(
+                            name for name in names if name in {"launch-hub.py", "launch-hub.sh"}
+                        ),
+                        "preferred": str(candidate).startswith(str(resolved_home)),
+                        "score": score,
+                    }
+                )
+    return sorted(
+        candidates,
+        key=lambda item: (
+            -int(bool(item["preferred"])),
+            -int(item["score"]),
+            str(item["path"]),
+        ),
+    )
+
+
+def _legacy_source_locator(*, home: Path | None = None) -> dict[str, Any]:
+    candidates = _legacy_source_candidates(home=home)
+    selected = candidates[0] if candidates else None
+    return {
+        "schema_version": 1,
+        "kind": "MCPMultiplexLegacyLocate",
+        "ok": selected is not None,
+        "candidates": candidates,
+        "selected_legacy_root": None if selected is None else selected["path"],
+        "selected_catalog_path": (
+            None
+            if selected is None or not selected["catalog_exports"]
+            else selected["catalog_exports"][0]
+        ),
+    }
+
+
+def _resolved_legacy_root(path: str | None, *, home: Path | None = None) -> Path:
+    if path:
+        return Path(path).expanduser().resolve()
+    located = _legacy_source_locator(home=home)
+    if located["selected_legacy_root"] is not None:
+        return Path(str(located["selected_legacy_root"])).expanduser().resolve()
+    return ((home or Path.home()).expanduser() / "mcp-hub").resolve()
+
+
+def _resolved_legacy_catalog_path(path: str | None, *, home: Path | None = None) -> Path:
+    if path:
+        return Path(path).expanduser().resolve()
+    located = _legacy_source_locator(home=home)
+    if located["selected_catalog_path"] is not None:
+        return Path(str(located["selected_catalog_path"])).expanduser().resolve()
+    raise LegacyCatalogImportError("no legacy MCP Hub catalog export was discovered")
 
 
 def _migration_dry_run_payload(legacy_root: Path) -> dict[str, Any]:
@@ -1457,6 +1720,65 @@ def _migration_dry_run_payload(legacy_root: Path) -> dict[str, Any]:
         "errors": errors,
     }
     return payload
+
+
+def _agent_onboarding_payload(
+    connection: sqlite3.Connection,
+    *,
+    home: Path | None = None,
+    agent_kinds: list[str] | None = None,
+) -> dict[str, Any]:
+    if home is None:
+        return {
+            "discovered_config_paths": [],
+            "discovery_notices": [],
+            "unregistered_agents": [],
+            "unregistered_count": 0,
+            "next_action": None,
+        }
+    discovery = discover_config_paths(home=home, agent_kinds=agent_kinds)
+    registered_kinds = {agent.agent_kind for agent in AgentRegistry(connection).list()}
+    unregistered = [
+        item.to_dict() for item in discovery.config_paths if item.agent_kind not in registered_kinds
+    ]
+    next_action = None
+    if unregistered:
+        resolved_home = (home or Path.home()).expanduser()
+        next_action = f"mxp agents sync --apply --home {resolved_home}"
+    return {
+        "discovered_config_paths": [item.to_dict() for item in discovery.config_paths],
+        "discovery_notices": [notice.to_dict() for notice in discovery.notices],
+        "unregistered_agents": unregistered,
+        "unregistered_count": len(unregistered),
+        "next_action": next_action,
+    }
+
+
+def _augment_status_with_onboarding(
+    payload: dict[str, Any],
+    *,
+    connection: sqlite3.Connection,
+    home: Path | None = None,
+) -> None:
+    onboarding = _agent_onboarding_payload(connection, home=home)
+    payload["onboarding"] = onboarding
+    if onboarding["unregistered_count"] == 0:
+        return
+    payload["ok"] = False
+    notices = list(payload.get("notices", []))
+    notices.append(
+        {
+            "code": "agent_configs_discovered_but_unregistered",
+            "detail": (
+                f"discovered {onboarding['unregistered_count']} agent config paths that are not "
+                "registered in Multiplex state"
+            ),
+        }
+    )
+    payload["notices"] = notices
+    summary = payload.get("summary")
+    if isinstance(summary, dict):
+        summary["notices"] = int(summary.get("notices", 0)) + 1
 
 
 EXPECTED_CERTIFICATION_TRANSCRIPTS = {
@@ -2751,9 +3073,10 @@ def build_parser(prog: str = "mxp") -> argparse.ArgumentParser:
     )
     cutover_dry_run.add_argument(
         "--legacy-root",
-        required=True,
-        help="legacy home/config root to inspect read-only",
+        default=None,
+        help="legacy home/config root to inspect read-only; auto-discovered when omitted",
     )
+    cutover_dry_run.add_argument("--home", default=None, help="override home for discovery roots")
     cutover_dry_run.set_defaults(handler=cutover_dry_run_command)
     cutover_import_catalog = cutover_subcommands.add_parser(
         "import-catalog",
@@ -2767,13 +3090,24 @@ def build_parser(prog: str = "mxp") -> argparse.ArgumentParser:
     )
     cutover_import_catalog.add_argument(
         "--catalog-path",
-        required=True,
-        help="legacy MCP Hub catalog export JSON to normalize",
+        default=None,
+        help="legacy MCP Hub catalog export JSON to normalize; auto-discovered when omitted",
     )
     cutover_import_catalog.add_argument(
         "--apply",
         action="store_true",
         help="write normalized entries to Multiplex catalog; default is dry-run",
+    )
+    cutover_import_catalog.add_argument(
+        "--sample-limit",
+        default=20,
+        type=int,
+        help="maximum entries/errors/warnings to emit in default summarized output",
+    )
+    cutover_import_catalog.add_argument(
+        "--full-entries",
+        action="store_true",
+        help="emit the full normalized entry list instead of bounded samples",
     )
     cutover_import_catalog.add_argument(
         "--db-path", default=None, help="path to Multiplex SQLite state"
@@ -2932,6 +3266,12 @@ def build_parser(prog: str = "mxp") -> argparse.ArgumentParser:
         help="skip process inspection and plan only filesystem/service cleanup",
     )
     cutover_cleanup.set_defaults(handler=cutover_legacy_cleanup_plan_command)
+    cutover_locate = cutover_subcommands.add_parser(
+        "locate",
+        help="locate likely legacy MCP Hub roots and catalog exports",
+    )
+    cutover_locate.add_argument("--home", default=None, help="override home for discovery roots")
+    cutover_locate.set_defaults(handler=cutover_locate_command)
 
     agents = subcommands.add_parser("agents", help="manage agent registrations and installs")
     agents_subcommands = agents.add_subparsers(dest="agents_command")
@@ -2975,6 +3315,24 @@ def build_parser(prog: str = "mxp") -> argparse.ArgumentParser:
         help="list first-wave control-plane auth install safety status",
     )
     auth_capabilities.set_defaults(handler=agents_auth_capabilities_command)
+    agents_sync = agents_subcommands.add_parser(
+        "sync",
+        help="discover first-wave agent configs and sync them into Multiplex state",
+    )
+    agents_sync.add_argument(
+        "--agent",
+        default=None,
+        choices=["codex", "claude_code", "gemini", "cline", "opencode"],
+        help="sync only one first-wave agent kind",
+    )
+    agents_sync.add_argument("--apply", action="store_true", help="persist discovered agent paths")
+    agents_sync.add_argument("--db-path", default=None, help="path to Multiplex SQLite state")
+    agents_sync.add_argument(
+        "--home",
+        default=None,
+        help="override home for discovery and state path",
+    )
+    agents_sync.set_defaults(handler=agents_sync_command)
     agents_self_check = agents_subcommands.add_parser(
         "self-check",
         help="report observed mcp_hub control-plane readiness for registered agents",
@@ -3007,7 +3365,7 @@ def build_parser(prog: str = "mxp") -> argparse.ArgumentParser:
     )
     tui.add_argument(
         "--legacy-root",
-        default="~/mcp-hub",
+        default=None,
         help="legacy MCP Hub root used by the cutover TUI view",
     )
     tui.add_argument(
@@ -3174,4 +3532,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if handler is None:
         parser.print_help(sys.stdout)
         return 0
-    return int(handler(args, sys.stdout, sys.stderr))
+    try:
+        return int(handler(args, sys.stdout, sys.stderr))
+    except BrokenPipeError:
+        return 0

@@ -50,6 +50,79 @@ def test_legacy_catalog_import_dry_run_normalizes_without_mutating_db(
     assert not db_path.exists()
 
 
+def test_legacy_catalog_import_default_output_is_summarized(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    catalog_path = tmp_path / "legacy-catalog.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "servers": [
+                    {
+                        "name": f"context7-{index}",
+                        "command": "npx",
+                        "args": ["-y", "@upstash/context7-mcp"],
+                        "env": {"CONTEXT7_TOKEN": "redacted-by-importer"},
+                    }
+                    for index in range(6)
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        cli_main(
+            [
+                "cutover",
+                "import-catalog",
+                "--from",
+                "mcp-hub",
+                "--catalog-path",
+                str(catalog_path),
+                "--sample-limit",
+                "2",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    result = payload["result"]
+    assert payload["summary"]["entry_count"] == 6
+    assert len(result["entries"]) == 2
+    assert result["entries_truncated"] is True
+    assert result["warnings_truncated"] is True
+    assert result["warnings_by_code"]["legacy_env_values_redacted"] == 6
+
+
+def test_legacy_catalog_import_full_entries_can_be_requested(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    catalog_path = _legacy_catalog_path(tmp_path)
+
+    assert (
+        cli_main(
+            [
+                "cutover",
+                "import-catalog",
+                "--from",
+                "mcp-hub",
+                "--catalog-path",
+                str(catalog_path),
+                "--full-entries",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert "entries_truncated" not in payload["result"]
+    assert len(payload["result"]["entries"]) == 1
+
+
 def test_legacy_catalog_import_apply_persists_entries_and_audit_event(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

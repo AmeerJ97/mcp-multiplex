@@ -1242,6 +1242,31 @@ def _insert_legacy_catalog_entry(connection: sqlite3.Connection, *, review_state
     CatalogStore(connection).upsert(CatalogEntry.from_dict(payload))
 
 
+def test_cutover_locate_finds_archived_legacy_root(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    legacy_root = tmp_path / "attic" / "mcp-hub-archive"
+    legacy_root.mkdir(parents=True)
+    (legacy_root / ".git").mkdir()
+    (legacy_root / "launch-hub.py").write_text("", encoding="utf-8")
+    (legacy_root / "hub.json").write_text('{"servers":{}}', encoding="utf-8")
+
+    assert cli_main(["cutover", "locate", "--home", str(tmp_path)]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+    assert payload["selected_legacy_root"] == str(legacy_root)
+    assert payload["selected_catalog_path"] == str(legacy_root / "hub.json")
+
+
+def test_legacy_process_detector_ignores_mxp_commands() -> None:
+    assert (
+        cli_module._is_legacy_mcp_hub_process("uv run mxp cutover dry-run --from mcp-hub")
+        is False
+    )
+
+
 def _insert_legacy_catalog_import_event(connection: sqlite3.Connection) -> None:
     EventStore(connection).append(
         event_id="evt_legacy_catalog_import_test",

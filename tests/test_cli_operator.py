@@ -569,6 +569,89 @@ def test_cli_agents_self_check_exits_nonzero_when_mcp_hub_missing(
     assert payload["agents"][0]["mcp_hub_entries"] == []
 
 
+def test_cli_agents_self_check_reports_unregistered_discovered_configs(
+    db_path: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / ".codex" / "config.toml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("[mcp_servers]\n", encoding="utf-8")
+
+    assert (
+        cli_main(
+            [
+                "agents",
+                "self-check",
+                "--agent",
+                "codex",
+                "--db-path",
+                str(db_path),
+                "--home",
+                str(tmp_path),
+            ]
+        )
+        == 1
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["agents"] == []
+    assert payload["discovered_config_paths"][0]["path"] == str(config_path)
+    assert payload["unregistered_agents"][0]["agent_kind"] == "codex"
+    assert payload["next_action"] == f"mxp agents sync --apply --home {tmp_path}"
+
+
+def test_cli_agents_sync_registers_discovered_configs(
+    db_path: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / ".codex" / "config.toml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("[mcp_servers]\n", encoding="utf-8")
+
+    assert (
+        cli_main(
+            [
+                "agents",
+                "sync",
+                "--agent",
+                "codex",
+                "--db-path",
+                str(db_path),
+                "--home",
+                str(tmp_path),
+                "--apply",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "MCPMultiplexAgentSync"
+    assert payload["change_count"] == 1
+    assert payload["synced_agents"][0]["agent_kind"] == "codex"
+    stored = AgentRegistry(connect(db_path)).show("agent_codex_user_default")
+    assert stored.config_paths[0].path == str(config_path)
+
+
+def test_cli_status_reports_onboarding_when_configs_are_unregistered(
+    db_path: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / ".codex" / "config.toml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("[mcp_servers]\n", encoding="utf-8")
+
+    assert cli_main(["status", "--json", "--db-path", str(db_path), "--home", str(tmp_path)]) == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert payload["onboarding"]["discovered_config_paths"][0]["path"] == str(config_path)
+    assert payload["onboarding"]["unregistered_count"] == 1
+
+
 def test_cli_apply_and_rollback_use_approved_plan(
     db_path: Path,
     tmp_path: Path,

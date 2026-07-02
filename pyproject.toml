@@ -74,6 +74,10 @@ include = [
   "/uv.lock",
 ]
 exclude = [
+  ".gitignore",
+  "/.gitignore",
+  "**/.gitkeep",
+  "/**/.gitkeep",
   "/.codex-checkpoints",
   "/docs/checkpoints",
   "/docs/FRESH_SESSION_PROMPT.md",
