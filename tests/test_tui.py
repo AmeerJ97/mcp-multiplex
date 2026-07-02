@@ -260,6 +260,56 @@ def test_cli_tui_repl_uses_stdin(
     assert "bye" in output
 
 
+def test_tui_render_shows_onboarding_for_unregistered_discovered_configs(tmp_path: Path) -> None:
+    connection = connect(tmp_path / "multiplex.db")
+    config_path = tmp_path / ".codex" / "config.toml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("[mcp_servers]\n", encoding="utf-8")
+
+    screen = render_tui(
+        connection,
+        home=tmp_path,
+        legacy_root=Path("/tmp/nonexistent-mcp-hub"),
+        include_processes=False,
+    )
+
+    assert "[Onboarding]" in screen.text
+    assert str(config_path) in screen.text
+    assert f"mxp agents sync --apply --home {tmp_path}" in screen.text
+
+
+def test_tui_cutover_shows_import_summary(tmp_path: Path) -> None:
+    connection = connect(tmp_path / "multiplex.db")
+    legacy_root = tmp_path / "mcp-hub"
+    legacy_root.mkdir()
+    (legacy_root / "hub.json").write_text(
+        json.dumps(
+            {
+                "servers": [
+                    {
+                        "name": "context7",
+                        "command": "npx",
+                        "args": ["-y", "@upstash/context7-mcp"],
+                        "env": {"CONTEXT7_TOKEN": "redacted-by-importer"},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (legacy_root / "launch-hub.py").write_text("", encoding="utf-8")
+
+    screen = render_tui(
+        connection,
+        home=tmp_path,
+        include_processes=False,
+    )
+
+    assert "located root: " + str(legacy_root) in screen.text
+    assert "located catalog: " + str(legacy_root / "hub.json") in screen.text
+    assert "importable entries: 1" in screen.text
+
+
 def _write_direct_config(tmp_path: Path) -> Path:
     config_path = tmp_path / "config.toml"
     config_path.write_text(

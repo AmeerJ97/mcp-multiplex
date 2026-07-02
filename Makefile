@@ -19,6 +19,7 @@ check: format-check lint typecheck test
 
 build:
 	uv build
+	python scripts/scrub_sdist_dotfiles.py dist/*.tar.gz
 
 dirs:
 	@ls -d src/mcp_multiplex/daemon \

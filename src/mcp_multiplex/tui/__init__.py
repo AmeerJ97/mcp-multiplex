@@ -15,10 +15,12 @@ from typing import Any, TextIO
 
 from mcp_multiplex.apply import ConfigBackupStore
 from mcp_multiplex.approvals import ApprovalStore
-from mcp_multiplex.catalog import CatalogCandidateStore
+from mcp_multiplex.catalog import CatalogCandidateStore, plan_legacy_mcp_hub_catalog_import
 from mcp_multiplex.cli import (
+    _agent_onboarding_payload,
     _legacy_cleanup_plan_payload,
     _legacy_mcp_hub_footprint_payload,
+    _legacy_source_locator,
     _plan_row,
     _runtime_sharing_explanation,
     status_payload,
@@ -39,6 +41,11 @@ CHANGE_EVENT_TYPES = {
 }
 
 REPL_COMMANDS = [
+    {
+        "name": "onboarding",
+        "aliases": ["setup", "sync"],
+        "description": "Show discovered configs, unregistered agents, and next steps.",
+    },
     {
         "name": "dashboard",
         "aliases": ["status", "refresh"],
@@ -233,6 +240,8 @@ def handle_repl_command(
         return _repl_result("bye\n", exit=True)
     if name == "commands":
         return _repl_result(_repl_help())
+    if name == "onboarding":
+        return _repl_result(_section_text(snapshot, "onboarding"))
     if name == "dashboard":
         return _repl_result(_section_text(snapshot, "dashboard"))
     if name == "all":
@@ -290,6 +299,7 @@ def tui_snapshot(
             "ok": status["ok"],
             "summary": status["summary"],
         },
+        "onboarding": _agent_onboarding_payload(connection, home=home),
         "problems": {
             "blockers": status["blockers"],
             "warnings": status["warnings"],
@@ -335,6 +345,7 @@ def render_snapshot(snapshot: dict[str, Any]) -> str:
             ),
         ]
     )
+    _render_onboarding(lines, snapshot["onboarding"])
     _render_problems(lines, snapshot["problems"])
     _render_agents(lines, snapshot["agents"])
     _render_cutover(lines, snapshot["cutover"])
@@ -381,6 +392,8 @@ def _section_text(snapshot: dict[str, Any], section: str) -> str:
                 ),
             ]
         )
+    elif section == "onboarding":
+        _render_onboarding(lines, snapshot["onboarding"])
     elif section == "agents":
         _render_agents(lines, snapshot["agents"])
     elif section == "cutover":
@@ -402,6 +415,23 @@ def _section_text(snapshot: dict[str, Any], section: str) -> str:
     else:
         lines.append(f"unknown section: {section}")
     return "\n".join(lines).strip() + "\n"
+
+
+def _render_onboarding(lines: list[str], onboarding: dict[str, Any]) -> None:
+    lines.extend(["", "[Onboarding]"])
+    discovered = onboarding["discovered_config_paths"]
+    if not discovered:
+        lines.append("- no agent configs discovered")
+    else:
+        lines.append(f"- discovered config paths: {len(discovered)}")
+        for item in discovered[:8]:
+            lines.append(f"  {item['agent_kind']}: {item['path']}")
+    if onboarding["unregistered_agents"]:
+        lines.append(f"- unregistered discovered paths: {onboarding['unregistered_count']}")
+        if onboarding["next_action"]:
+            lines.append(f"  next: {onboarding['next_action']}")
+    else:
+        lines.append("- registration state is in sync")
 
 
 def _approval_rows(
@@ -556,8 +586,23 @@ def _cutover_view(
         and record.payload.get("legacy_mcp_hub_deprecated") is True
     ]
     latest = events[-1] if events else None
+    located = _legacy_source_locator(home=home)
+    import_summary = None
+    selected_catalog_path = located["selected_catalog_path"]
+    if selected_catalog_path:
+        try:
+            import_plan = plan_legacy_mcp_hub_catalog_import(Path(str(selected_catalog_path)))
+        except Exception:  # noqa: BLE001 - summary is best-effort in the TUI.
+            import_summary = None
+        else:
+            import_summary = import_plan.to_summary_dict(sample_limit=5)
+    resolved_legacy_root = (
+        legacy_root.expanduser().resolve()
+        if legacy_root is not None
+        else Path(str(located["selected_legacy_root"] or Path("~/mcp-hub").expanduser())).resolve()
+    )
     footprint = _legacy_mcp_hub_footprint_payload(
-        legacy_root=(legacy_root or Path("~/mcp-hub")).expanduser().resolve(),
+        legacy_root=resolved_legacy_root,
         home=home,
         ps_bin="ps",
         include_processes=include_processes,
@@ -574,6 +619,9 @@ def _cutover_view(
         ],
         "legacy_process_matches": footprint["process_scan"]["match_count"],
         "cleanup_step_count": cleanup_plan["step_count"],
+        "located_legacy_root": located["selected_legacy_root"],
+        "located_catalog_path": located["selected_catalog_path"],
+        "import_summary": import_summary,
         "cleanup_steps": [
             {
                 "step_id": step["step_id"],
@@ -685,6 +733,26 @@ def _render_cutover(lines: list[str], cutover: dict[str, Any]) -> None:
         f"- state={state} legacy_mcp_hub_deprecated={deprecated} "
         f"footprint={footprint} cleanup_steps={cutover['cleanup_step_count']}"
     )
+    if cutover["located_legacy_root"]:
+        lines.append(f"  located root: {cutover['located_legacy_root']}")
+    if cutover["located_catalog_path"]:
+        lines.append(f"  located catalog: {cutover['located_catalog_path']}")
+    if cutover["import_summary"] is not None:
+        summary = cutover["import_summary"]
+        lines.append(
+            f"  importable entries: {summary['entry_count']} "
+            f"warnings: {len(summary['warnings'])}{'+' if summary['warnings_truncated'] else ''}"
+        )
+        if summary["warnings_by_code"]:
+            ranked_codes = sorted(
+                summary["warnings_by_code"].items(),
+                key=lambda item: (-item[1], item[0]),
+            )[:3]
+            top_codes = ", ".join(
+                f"{code}={count}"
+                for code, count in ranked_codes
+            )
+            lines.append(f"  top warning buckets: {top_codes}")
     if cutover["latest_event_id"]:
         lines.append(
             f"  cutover_event={cutover['latest_event_id']} hash={cutover['latest_event_hash']}"
